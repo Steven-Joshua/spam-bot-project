@@ -7,7 +7,7 @@ import numpy as np
 import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from db import insert_message  # Import database logging function
+from db import insert_message  # Import the database logging function
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -16,8 +16,10 @@ logging.basicConfig(level=logging.INFO)
 try:
     loaded_model = joblib.load("spam_classifier_model.pkl")
     loaded_vectorizer = joblib.load("tfidf_vectorizer.pkl")
+    logging.info("✅ Model and Vectorizer loaded successfully.")
 except FileNotFoundError:
-    raise FileNotFoundError("Model or vectorizer file is missing. Ensure they are present before running the app.")
+    logging.error("❌ Model or vectorizer file is missing. Ensure they are present before running the app.")
+    raise FileNotFoundError("Model or vectorizer file is missing.")
 
 # Optimal spam classification threshold
 optimal_threshold = 0.24  
@@ -33,38 +35,47 @@ app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
 def preprocess_image(image_path):
     """Preprocess image for better OCR accuracy"""
-    image = cv2.imread(image_path)
-    if image is None:
-        raise ValueError("Error loading image. Check file path and format.")
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    cv2.imwrite("processed_image.png", thresh)  # Debugging
-    return thresh
+    try:
+        image = cv2.imread(image_path)
+        if image is None:
+            raise ValueError("Error loading image. Check file path and format.")
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        cv2.imwrite("processed_image.png", thresh)  # Debugging
+        return thresh
+    except Exception as e:
+        logging.error(f"❌ Image preprocessing failed: {e}")
+        raise
 
 def extract_text_from_image(image_path):
     """Extracts text from an image using OCR"""
-    processed_image = preprocess_image(image_path)
-    extracted_text = pytesseract.image_to_string(processed_image)
-    if not extracted_text.strip():
-        return "No readable text found."
-    return clean_extracted_text(extracted_text)
+    try:
+        processed_image = preprocess_image(image_path)
+        extracted_text = pytesseract.image_to_string(processed_image).strip()
+        return clean_extracted_text(extracted_text) if extracted_text else "No readable text found."
+    except Exception as e:
+        logging.error(f"❌ OCR Error: {e}")
+        return "OCR Error"
 
 def clean_extracted_text(text):
     """Cleans extracted text for better classification"""
-    text = text.replace("\n", " ").strip()
-    text = ' '.join(text.split())
-    text = re.sub(r"[^a-zA-Z0-9\s:/]", "", text)
-    text = re.sub(r"\b[a-zA-Z]{1,2}\b", "", text)
+    text = re.sub(r"[^a-zA-Z0-9\s:/]", "", text.replace("\n", " ").strip())
+    text = re.sub(r"\b[a-zA-Z]{1,2}\b", "", text)  # Remove single-letter words
     return text.lower()
 
 def classify_text(text):
     """Classifies input text as spam or ham"""
-    if not text.strip():
-        return 0.0, "Invalid or empty text input."
-    text_tfidf = loaded_vectorizer.transform([text])
-    spam_probability = loaded_model.predict_proba(text_tfidf)[:, 1][0]
-    prediction = "Spam" if spam_probability > optimal_threshold else "Ham"
-    return spam_probability, prediction
+    try:
+        if not text.strip():
+            return 0.0, "Invalid or empty text input."
+        
+        text_tfidf = loaded_vectorizer.transform([text])
+        spam_probability = loaded_model.predict_proba(text_tfidf)[:, 1][0]
+        prediction = "Spam" if spam_probability > optimal_threshold else "Ham"
+        return spam_probability, prediction
+    except Exception as e:
+        logging.error(f"❌ Classification Error: {e}")
+        return 0.0, "Error in classification"
 
 @app.route("/test-text", methods=["POST"])
 def test_text():
@@ -118,6 +129,11 @@ def test_image():
         "Spam Probability": round(spam_probability, 2),
         "Prediction": prediction
     })
+
+@app.route("/", methods=["GET"])
+def home():
+    """Root endpoint"""
+    return jsonify({"message": "✅ Spam Detection API is running!"})
 
 @app.errorhandler(Exception)
 def handle_exception(e):
