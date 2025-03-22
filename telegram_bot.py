@@ -2,9 +2,9 @@ import requests
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
-TOKEN = ""
-FLASK_API_URL_TEXT =  "" # Adjust if Flask is hosted elsewhere
-FLASK_API_URL_IMAGE = "" # Adjust if Flask is hosted elsewhere
+TOKEN = "7366451982:AAGgA3TlhLwyXmJvlpIUvBgqHtmORFvn-nU"
+FLASK_API_URL_TEXT =  "http://127.0.0.1:5000/test-text" # Adjust if Flask is hosted elsewhere
+FLASK_API_URL_IMAGE = "http://127.0.0.1:5000/test-image" # Adjust if Flask is hosted elsewhere
 
 # Start Command
 async def start(update: Update, context: CallbackContext):

@@ -5,7 +5,7 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # Load image
-image_path = "C:/Users/Joshua/Downloads/Ai/dataset/img_dataset/Whatsapp_2.jpg"
+image_path = "C:/Users/Joshua/Downloads/Ai/dataset/WhatsApp Image 2025-03-17 at 12.52.26_6b267322.jpg"
 image = cv2.imread(image_path)
 
 # Convert to grayscale

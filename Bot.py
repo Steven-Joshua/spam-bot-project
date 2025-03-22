@@ -17,41 +17,46 @@ optimal_threshold = 0.24
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 def preprocess_image(image_path):
-    """Preprocess image for better OCR accuracy"""
+    """Preprocess image for better OCR accuracy."""
     image = cv2.imread(image_path)
     
     if image is None:
         raise ValueError("Error loading image. Check file path and format.")
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
-    
+
     # Resize for better OCR accuracy
     scale_factor = 1.5
     new_size = (int(gray.shape[1] * scale_factor), int(gray.shape[0] * scale_factor))
     gray = cv2.resize(gray, new_size, interpolation=cv2.INTER_LINEAR)
 
-    # Apply adaptive thresholding (better for uneven lighting)
-    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                   cv2.THRESH_BINARY, 11, 2)
-    
+    # Apply both OTSU thresholding and Adaptive Thresholding
+    otsu_thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    adaptive_thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                            cv2.THRESH_BINARY, 11, 2)
+
     # Remove small noise using morphological opening
     kernel = np.ones((1,1), np.uint8)
-    cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+    cleaned = cv2.morphologyEx(adaptive_thresh, cv2.MORPH_OPEN, kernel)
 
+    # Save processed image for debugging
+    cv2.imwrite("processed_image.png", cleaned)
+    
     return cleaned
 
 def extract_text_from_image(image_path):
-    """Extracts text from an image using OCR"""
+    """Extracts text from an image using OCR."""
     processed_image = preprocess_image(image_path)
-    extracted_text = pytesseract.image_to_string(processed_image)
-
+    
+    extracted_text = pytesseract.image_to_string(processed_image, config="--psm 6")  # Use OCR mode 6
+    
     if not extracted_text.strip():
         return "No readable text found in the image."
 
     return clean_extracted_text(extracted_text)
 
 def clean_extracted_text(text):
-    """Cleans extracted text for better classification"""
+    """Cleans extracted text for better classification."""
     text = text.replace("\n", " ").strip()  # Remove new lines
     text = ' '.join(text.split())  # Remove extra spaces
     text = re.sub(r"[^a-zA-Z0-9\s:/]", "", text)  # Remove special characters except URLs
@@ -59,17 +64,18 @@ def clean_extracted_text(text):
     return text.lower()  # Convert to lowercase
 
 def classify_text(text):
-    """Classifies input text as spam or ham"""
+    """Classifies input text as spam or ham."""
     if not text.strip():
         return 0.0, "Invalid or empty text input."
 
     text_tfidf = loaded_vectorizer.transform([text])
     spam_probability = loaded_model.predict_proba(text_tfidf)[:, 1][0]
     prediction = "Spam" if spam_probability > optimal_threshold else "Ham"
+    
     return spam_probability, prediction
 
 def spam_detection_bot(input_data):
-    """Determines whether input is text or an image and classifies it"""
+    """Determines whether input is text or an image and classifies it."""
     
     if isinstance(input_data, str):  
         if os.path.exists(input_data) and input_data.lower().endswith(('.png', '.jpg', '.jpeg')):  
