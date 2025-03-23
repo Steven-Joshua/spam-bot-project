@@ -1,14 +1,11 @@
-import os
 import psycopg2
 from psycopg2 import sql
-
-# Fetch PostgreSQL database credentials from Render's environment variables
-DB_URL = os.getenv("DATABASE_URL")  # Render provides this automatically
+from config import DATABASE_URL  # Import connection URL from config.py
 
 def get_db_connection():
     """Establishes a database connection with PostgreSQL."""
     try:
-        connection = psycopg2.connect(DB_URL, sslmode="require")
+        connection = psycopg2.connect(DATABASE_URL, sslmode="require")
         return connection
     except psycopg2.Error as err:
         print(f"Database connection failed: {err}")
