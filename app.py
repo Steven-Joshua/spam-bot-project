@@ -5,6 +5,7 @@ import os
 import re
 import numpy as np
 import logging
+import platform
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from db import insert_message  # Import the database logging function
@@ -24,8 +25,11 @@ except FileNotFoundError:
 # Optimal spam classification threshold
 optimal_threshold = 0.24  
 
-# Configure Tesseract (Ensure this path is correct)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# Configure Tesseract Path (Handles Windows & Linux)
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+else:
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 app = Flask(__name__)
 CORS(app)  # Allow frontend requests
