@@ -8,7 +8,7 @@ import logging
 import platform
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from db import insert_message  # Import the database logging function
+from db import insert_message  # Import database logging function
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -25,11 +25,11 @@ except FileNotFoundError:
 # Optimal spam classification threshold
 optimal_threshold = 0.24  
 
-# Configure Tesseract Path (Handles Windows & Linux)
+# Configure Tesseract Path (Handles Windows, Linux, & Render)
 if platform.system() == "Windows":
     pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 else:
-    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+    pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_PATH", "/usr/bin/tesseract")
 
 app = Flask(__name__)
 CORS(app)  # Allow frontend requests
@@ -56,7 +56,11 @@ def extract_text_from_image(image_path):
     try:
         processed_image = preprocess_image(image_path)
         extracted_text = pytesseract.image_to_string(processed_image).strip()
-        return clean_extracted_text(extracted_text) if extracted_text else "No readable text found."
+
+        if not extracted_text:
+            return "No readable text found."
+
+        return clean_extracted_text(extracted_text)
     except Exception as e:
         logging.error(f"❌ OCR Error: {e}")
         return "OCR Error"
@@ -92,7 +96,12 @@ def test_text():
         return jsonify({"error": "Text input is required."}), 400
 
     spam_probability, prediction = classify_text(text)
-    insert_message(source, text, spam_probability, prediction)
+
+    # Ensure DB errors don’t crash the app
+    try:
+        insert_message(source, text, spam_probability, prediction)
+    except Exception as e:
+        logging.error(f"Database Error: {e}")
 
     return jsonify({
         "Source": source,
@@ -125,7 +134,11 @@ def test_image():
         return jsonify({"message": "Image processed, but no readable text detected."})
 
     spam_probability, prediction = classify_text(extracted_text)
-    insert_message(source, extracted_text, spam_probability, prediction)
+
+    try:
+        insert_message(source, extracted_text, spam_probability, prediction)
+    except Exception as e:
+        logging.error(f"Database Error: {e}")
 
     return jsonify({
         "Source": source,
