@@ -1,63 +1,87 @@
 import requests
+import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
-TOKEN = "7366451982:AAGgA3TlhLwyXmJvlpIUvBgqHtmORFvn-nU"
-FLASK_API_URL_TEXT =  "http://127.0.0.1:5000/test-text" # Adjust if Flask is hosted elsewhere
-FLASK_API_URL_IMAGE = "http://127.0.0.1:5000/test-image" # Adjust if Flask is hosted elsewhere
+# Telegram Bot Token
+TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+
+# Flask API URLs (Change according to your deployment)
+FLASK_API_URL_TEXT = "https://spam-bot-project.onrender.com/test-text"
+FLASK_API_URL_IMAGE = "https://spam-bot-project.onrender.com/test-image"
 
 # Start Command
 async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("Hello! Send me a message or an image, and I'll check if it's spam.")
+    """Handles /start command."""
+    await update.message.reply_text("🤖 Hello! Send me a message or an image, and I'll check if it's spam.")
 
 # Function to Handle Text Messages
 async def check_spam(update: Update, context: CallbackContext):
+    """Handles text messages and checks for spam."""
     user_message = update.message.text
-    chat_id = update.message.chat_id  # Use chat ID as 'source'
+    chat_id = update.message.chat_id  # Using chat ID as 'source'
 
-    payload = {"text": user_message, "source": str(chat_id)}
-    response = requests.post(FLASK_API_URL_TEXT, json=payload)
+    payload = {"text": user_message, "source": "Telegram"}
 
-    if response.status_code == 200:
+    try:
+        response = requests.post(FLASK_API_URL_TEXT, json=payload)
+        response.raise_for_status()
         result = response.json()
-        response_text = f"📩 **Source:** {result['Source']}\n" \
-                        f"📝 **Text:** {result['Message Text']}\n" \
-                        f"🔢 **Spam Probability:** {result['Spam Probability']}\n" \
-                        f"⚠️ **Prediction:** {result['Prediction']}"
-    else:
-        response_text = "❌ Error processing the message."
+
+        response_text = (
+            f"📩 **Source:** {result.get('Source', 'Unknown')}\n"
+            f"📝 **Text:** {result.get('Message Text', 'N/A')}\n"
+            f"🔢 **Spam Probability:** {result.get('Spam Probability', 'N/A')}\n"
+            f"⚠️ **Prediction:** {result.get('Prediction', 'N/A')}"
+        )
+
+    except requests.exceptions.RequestException as e:
+        response_text = f"❌ Error processing the message.\n\n🔍 Debug Info:\n{e}"
 
     await update.message.reply_text(response_text)
 
-# Function to Handle Images
+# Function to Handle Image Messages
 async def check_image(update: Update, context: CallbackContext):
-    chat_id = update.message.chat_id  # Use chat ID as 'source'
-    file = await update.message.photo[-1].get_file()
-    file_path = await file.download()
+    """Handles image uploads, extracts text, and checks for spam."""
+    chat_id = update.message.chat_id
+    photo = update.message.photo[-1]
+    file = await photo.get_file()
+    
+    file_path = f"temp_{chat_id}.jpg"
+    await file.download_to_drive(file_path)
 
-    with open(file_path, "rb") as img_file:
-        response = requests.post(FLASK_API_URL_IMAGE, files={"file": img_file}, data={"source": str(chat_id)})
+    try:
+        with open(file_path, "rb") as img_file:
+            response = requests.post(
+                FLASK_API_URL_IMAGE, 
+                files={"file": img_file}, 
+                data={"source": "Telegram"}
+            )
+            response.raise_for_status()
+            result = response.json()
 
-    if response.status_code == 200:
-        result = response.json()
-        response_text = f"📩 **Source:** {result['Source']}\n" \
-                        f"📝 **Extracted Text:** {result['Extracted Text']}\n" \
-                        f"🔢 **Spam Probability:** {result['Spam Probability']}\n" \
-                        f"⚠️ **Prediction:** {result['Prediction']}"
-    else:
-        response_text = "❌ Error processing the image."
+            response_text = (
+                f"📩 **Source:** {result.get('Source', 'Unknown')}\n"
+                f"📝 **Extracted Text:** {result.get('Extracted Text', 'N/A')}\n"
+                f"🔢 **Spam Probability:** {result.get('Spam Probability', 'N/A')}\n"
+                f"⚠️ **Prediction:** {result.get('Prediction', 'N/A')}"
+            )
+
+    except requests.exceptions.RequestException as e:
+        response_text = f"❌ Error processing the image.\n\n🔍 Debug Info:\n{e}"
+
+    finally:
+        os.remove(file_path)
 
     await update.message.reply_text(response_text)
 
-# Main Function to Set Up Bot
+# Run the bot
 def main():
     app = Application.builder().token(TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_spam))
-    app.add_handler(MessageHandler(filters.PHOTO, check_image))  # Handle image uploads
-
-    print("Bot is running...")
+    app.add_handler(MessageHandler(filters.TEXT, check_spam))
+    app.add_handler(MessageHandler(filters.PHOTO, check_image))
+    print("🤖 Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
