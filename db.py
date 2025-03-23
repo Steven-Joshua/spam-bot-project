@@ -1,23 +1,21 @@
-import mysql.connector
-from config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+import os
+import psycopg2
+from psycopg2 import sql
+
+# Fetch PostgreSQL database credentials from Render's environment variables
+DB_URL = os.getenv("DATABASE_URL")  # Render provides this automatically
 
 def get_db_connection():
-    """Establishes a database connection."""
+    """Establishes a database connection with PostgreSQL."""
     try:
-        connection = mysql.connector.connect(
-            host=DB_HOST,
-            port=DB_PORT,  # Ensure the port is correctly set
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
-        )
+        connection = psycopg2.connect(DB_URL, sslmode="require")
         return connection
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         print(f"Database connection failed: {err}")
         return None
 
 def insert_message(source, message_text, spam_probability, prediction, file_path=None):
-    """Inserts a classified message into the database."""
+    """Inserts a classified message into the PostgreSQL database."""
     connection = get_db_connection()
     if connection is None:
         print("Database connection failed. Message not logged.")
@@ -37,16 +35,16 @@ def insert_message(source, message_text, spam_probability, prediction, file_path
               f"prediction={prediction},")
 
         cursor = connection.cursor()
-        sql = """INSERT INTO message_logs 
-                 (source, message_text, spam_probability, prediction, timestamp) 
-                 VALUES (%s, %s, %s, %s, NOW())"""
+        sql_query = """INSERT INTO message_logs 
+                       (source, message_text, spam_probability, prediction, timestamp) 
+                       VALUES (%s, %s, %s, %s, NOW())"""
         values = (source, message_text, spam_probability, prediction)
 
-        cursor.execute(sql, values)
+        cursor.execute(sql_query, values)
         connection.commit()
         print("Message logged successfully.")
 
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         print(f"Database error: {err}")
     
     finally:
