@@ -7,8 +7,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
 
 # Flask API URLs (Change according to your deployment)
-FLASK_API_URL_TEXT = "https://spam-bot-project.onrender.com/test-text"
-FLASK_API_URL_IMAGE = "https://spam-bot-project.onrender.com/test-image"
+FLASK_API_URL_TEXT = "domain url"
+FLASK_API_URL_IMAGE = "domain url"
 
 # Start Command
 async def start(update: Update, context: CallbackContext):
